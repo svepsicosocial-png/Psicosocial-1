@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IETR Avanzado + Descarga</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;max-width:1000px;margin:20px auto}
+input,select,button{width:100%;padding:8px;margin:5px 0}
+.card{border:1px solid #ccc;border-radius:10px;padding:15px;margin-bottom:20px}
+</style>
+</head>
+<body>
+
+<h1>IETR - Índice de Estrés en Tiempo Real</h1>
+
+<div class="card">
+<h2>Datos del trabajador</h2>
+<input id="nombre" placeholder="Nombre completo">
+<input id="dependencia" placeholder="Dependencia">
+<input id="area" placeholder="Área">
+
+<select id="ubicacion">
+<option>Calle 100</option>
+<option>Campus</option>
+<option>Street</option>
+<option>Facultad de Medicina</option>
+<option>Teletrabajo</option>
+<option>Trabajo en Casa</option>
+</select>
+</div>
+
+<div class="card">
+<h2>Evaluación</h2>
+
+<label>¿Cómo se siente?</label>
+<select id="tension">
+<option value="0">😌 Muy tranquilo</option>
+<option value="1">🙂 Relajado</option>
+<option value="2">😐 Neutral</option>
+<option value="3">😟 Tensionado</option>
+<option value="4">😣 Sobrecargado</option>
+</select>
+
+<label>Manejo de tareas</label>
+<select id="control">
+<option value="0">🟢 Totalmente</option>
+<option value="1">🟡 Parcialmente</option>
+<option value="2">🔴 Difícilmente</option>
+</select>
+
+<label>Estado mental</label>
+<select id="mente">
+<option value="0">🎯 Concentrada</option>
+<option value="1">🔄 Dispersa</option>
+<option value="2">⚡ Saturada</option>
+</select>
+
+<label>Fuente de presión</label>
+<select id="presion">
+<option>Tiempo</option>
+<option>Cantidad de trabajo</option>
+<option>Personas</option>
+<option>Tecnología</option>
+<option>Problemas personales</option>
+<option>Nada en particular</option>
+</select>
+
+<label>Nivel de energía</label>
+<select id="energia">
+<option value="0">🔋🔋🔋🔋🔋</option>
+<option value="1">🔋🔋🔋🔋⬜</option>
+<option value="2">🔋🔋🔋⬜⬜</option>
+<option value="3">🔋🔋⬜⬜⬜</option>
+<option value="4">🔋⬜⬜⬜⬜</option>
+</select>
+
+<button onclick="guardar()">Registrar medición</button>
+<button onclick="descargarPDF()">Descargar informe PDF</button>
+
+<h3 id="resultado"></h3>
+</div>
+
+<div class="card">
+<h2>Evolución del estrés</h2>
+<canvas id="grafico"></canvas>
+</div>
+
+<script>
+let chart;
+let ultimoRegistro = null;
+
+function interpretar(score){
+ if(score<=3) return "Óptimo";
+ if(score<=6) return "Atención";
+ if(score<=9) return "Estrés Alto";
+ return "Estrés Crítico";
+}
+
+function recomendaciones(nivel){
+ if(nivel==="Óptimo")
+  return "Mantenga hábitos saludables, pausas activas y equilibrio trabajo-vida.";
+ if(nivel==="Atención")
+  return "Realice pausas activas cada 2 horas, priorice tareas y practique respiración consciente.";
+ if(nivel==="Estrés Alto")
+  return "Solicite apoyo de su líder, reorganice cargas laborales e incremente pausas de recuperación.";
+ return "Se recomienda contacto inmediato con apoyo psicosocial, revisión de carga laboral y seguimiento profesional.";
+}
+
+function guardar(){
+
+ let score =
+ parseInt(tension.value)+
+ parseInt(control.value)+
+ parseInt(mente.value)+
+ parseInt(energia.value);
+
+ let fecha = new Date();
+
+ let registro={
+ fecha:fecha.toLocaleString(),
+ horaExacta:fecha.toLocaleTimeString(),
+ nombre:nombre.value,
+ dependencia:dependencia.value,
+ area:area.value,
+ ubicacion:ubicacion.value,
+ score:score,
+ nivel:interpretar(score),
+ presion:presion.value
+ };
+
+ ultimoRegistro = registro;
+
+ let datos=JSON.parse(localStorage.getItem("ietr")||"[]");
+ datos.push(registro);
+ localStorage.setItem("ietr",JSON.stringify(datos));
+
+ resultado.innerHTML=
+ "Puntaje: "+score+"/12 | Nivel: "+registro.nivel;
+
+ cargarGrafico();
+}
+
+function cargarGrafico(){
+
+ let datos=JSON.parse(localStorage.getItem("ietr")||"[]");
+
+ let etiquetas=datos.map(x=>x.fecha);
+ let valores=datos.map(x=>x.score);
+
+ if(chart){ chart.destroy(); }
+
+ chart=new Chart(document.getElementById("grafico"),{
+  type:'line',
+  data:{
+   labels:etiquetas,
+   datasets:[{
+    label:'Nivel de Estrés',
+    data:valores
+   }]
+  },
+  options:{
+   responsive:true,
+   scales:{
+    y:{min:0,max:12}
+   }
+  }
+ });
+}
+
+async function descargarPDF(){
+
+ if(!ultimoRegistro){
+  alert("Primero registre una medición.");
+  return;
+ }
+
+ const { jsPDF } = window.jspdf;
+ const doc = new jsPDF();
+
+ doc.setFontSize(16);
+ doc.text("Informe Individual IETR",10,15);
+
+ let y=30;
+
+ [
+  "Nombre: "+ultimoRegistro.nombre,
+  "Dependencia: "+ultimoRegistro.dependencia,
+  "Área: "+ultimoRegistro.area,
+  "Ubicación: "+ultimoRegistro.ubicacion,
+  "Fecha y hora: "+ultimoRegistro.fecha,
+  "Hora exacta: "+ultimoRegistro.horaExacta,
+  "Factor principal de presión: "+ultimoRegistro.presion,
+  "Puntaje IETR: "+ultimoRegistro.score+"/12",
+  "Nivel de estrés: "+ultimoRegistro.nivel,
+  "",
+  "Recomendaciones:",
+  recomendaciones(ultimoRegistro.nivel)
+ ].forEach(t=>{
+   doc.text(t,10,y);
+   y+=8;
+ });
+
+ const canvas = document.getElementById("grafico");
+ const img = canvas.toDataURL("image/png");
+
+ doc.addPage();
+ doc.setFontSize(14);
+ doc.text("Evolución del Estrés",10,15);
+ doc.addImage(img,"PNG",10,25,180,90);
+
+ doc.save("Informe_IETR_Completo.pdf");
+}
+
+cargarGrafico();
+</script>
+</body>
+</html>
